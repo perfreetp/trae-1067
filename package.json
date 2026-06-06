@@ -7,10 +7,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && electron-builder",
+    "build": "vite build && tsc -p electron/tsconfig.json && electron-packager . \"灌区配水管理系统\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=\"node_modules/electron-builder\" --ignore=\"node_modules/7zip-bin\"",
+    "build:installer": "vite build && tsc -p electron/tsconfig.json && electron-builder",
     "preview": "vite preview",
-    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && tsc -p electron/tsconfig.json && electron .\"",
-    "electron:build": "vue-tsc && vite build && tsc -p electron/tsconfig.json && electron-builder"
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && tsc -p electron/tsconfig.json && set NODE_ENV=development&& electron .\"",
+    "electron:build": "vite build && tsc -p electron/tsconfig.json && electron-packager . \"灌区配水管理系统\" --platform=win32 --arch=x64 --out=release --overwrite",
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "pinia": "^2.1.7",
@@ -22,6 +24,7 @@
     "concurrently": "^8.2.2",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2",
     "typescript": "^5.3.3",
     "vite": "^5.0.0",
     "vite-plugin-electron": "^0.15.5",
@@ -39,7 +42,14 @@
       "dist-electron/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }

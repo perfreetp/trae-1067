@@ -170,16 +170,28 @@ import { useIrrigationStore } from '@/stores/irrigation'
 
 const store = useIrrigationStore()
 
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
 const comparisonData = computed(() => {
-  return [
-    { date: '6/10', planned: 8500, actual: 8200 },
-    { date: '6/11', planned: 9200, actual: 8800 },
-    { date: '6/12', planned: 7800, actual: 7500 },
-    { date: '6/13', planned: 10500, actual: 10200 },
-    { date: '6/14', planned: 9800, actual: 9600 },
-    { date: '6/15', planned: 11000, actual: 10500 },
-    { date: '6/16', planned: 12000, actual: 0 }
-  ]
+  const data = []
+  const baseDate = new Date()
+  baseDate.setDate(baseDate.getDate() - 6)
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(baseDate)
+    date.setDate(date.getDate() + i)
+    const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
+    
+    const seed = date.getTime()
+    const planned = 8000 + Math.round(seededRandom(seed) * 4000)
+    const actual = i < 6 ? Math.round(planned * (0.88 + seededRandom(seed + 1) * 0.08)) : 0
+    
+    data.push({ date: dateStr, planned, actual })
+  }
+  return data
 })
 
 const maxValue = computed(() => {
@@ -187,31 +199,83 @@ const maxValue = computed(() => {
 })
 
 const totalPlanned = computed(() => {
-  return store.allocations.reduce((sum, a) => sum + a.allocatedAmount, 0)
+  if (store.allocations.length > 0) {
+    return store.allocations.reduce((sum, a) => sum + a.allocatedAmount, 0)
+  }
+  return store.applications.reduce((sum, a) => sum + a.requiredWaterAmount, 0)
 })
 
 const totalActual = computed(() => {
-  return Math.round(totalPlanned.value * 0.92)
+  const completedCount = store.allocations.filter(a => a.status === 'completed').length
+  if (completedCount > 0) {
+    const completed = store.allocations.filter(a => a.status === 'completed')
+    return completed.reduce((sum, a) => sum + (a.actualAmount || Math.round(a.allocatedAmount * 0.92)), 0)
+  }
+  return Math.round(totalPlanned.value * 0.85)
 })
 
 const avgArrivalRate = computed(() => {
-  return 92
+  if (totalPlanned.value === 0) return 0
+  return Math.round((totalActual.value / totalPlanned.value) * 100)
 })
 
 const totalWaterSaving = computed(() => {
-  return 1250
+  return Math.round(totalPlanned.value * 0.08)
 })
 
 const waterUsageReports = computed(() => {
-  return store.applications.map(app => ({
-    villageName: app.villageName,
-    cropArea: app.cropArea,
-    plannedWater: app.requiredWaterAmount,
-    actualWater: Math.round(app.requiredWaterAmount * (0.85 + Math.random() * 0.15)),
-    arrivalRate: Math.round(85 + Math.random() * 15),
-    overTimeMinutes: Math.floor(Math.random() * 60),
-    waterSaving: Math.round(Math.random() * 500 - 100)
-  }))
+  const reports = []
+  
+  if (store.allocations.length > 0) {
+    const villageMap = new Map<string, { planned: number; area: number; cropType: string }>()
+    
+    for (const alloc of store.allocations) {
+      const app = store.applications.find(a => a.villageName === alloc.targetArea)
+      const existing = villageMap.get(alloc.targetArea) || { planned: 0, area: app?.cropArea || 0, cropType: app?.cropType || '' }
+      existing.planned += alloc.allocatedAmount
+      villageMap.set(alloc.targetArea, existing)
+    }
+    
+    villageMap.forEach((data, villageName) => {
+      const seed = villageName.charCodeAt(0) + villageName.charCodeAt(villageName.length - 1)
+      const actualWater = Math.round(data.planned * (0.82 + seededRandom(seed) * 0.15))
+      const arrivalRate = Math.round((actualWater / data.planned) * 100)
+      const overTimeMinutes = Math.floor(seededRandom(seed + 2) * 45)
+      const waterSaving = data.planned - actualWater
+      
+      reports.push({
+        villageName,
+        cropArea: data.area,
+        plannedWater: data.planned,
+        actualWater,
+        arrivalRate,
+        overTimeMinutes,
+        waterSaving
+      })
+    })
+  }
+  
+  if (reports.length === 0) {
+    for (const app of store.applications) {
+      const seed = app.villageName.charCodeAt(0) + app.villageName.charCodeAt(app.villageName.length - 1)
+      const actualWater = Math.round(app.requiredWaterAmount * (0.82 + seededRandom(seed) * 0.15))
+      const arrivalRate = Math.round((actualWater / app.requiredWaterAmount) * 100)
+      const overTimeMinutes = Math.floor(seededRandom(seed + 2) * 45)
+      const waterSaving = app.requiredWaterAmount - actualWater
+      
+      reports.push({
+        villageName: app.villageName,
+        cropArea: app.cropArea,
+        plannedWater: app.requiredWaterAmount,
+        actualWater,
+        arrivalRate,
+        overTimeMinutes,
+        waterSaving
+      })
+    }
+  }
+  
+  return reports
 })
 
 const suggestions = computed(() => [
@@ -236,12 +300,28 @@ const totalCropArea = computed(() => {
   return store.applications.reduce((sum, a) => sum + a.cropArea, 0)
 })
 
-const canalUtilization = computed(() => 72)
-const responseRate = computed(() => 95)
-const rotationCompletion = computed(() => 88)
+const canalUtilization = computed(() => {
+  if (store.canals.length === 0) return 0
+  const totalFlow = store.canals.reduce((sum, c) => sum + c.flowRate, 0)
+  const maxFlow = store.canals.reduce((sum, c) => sum + c.maxFlowRate, 0)
+  return Math.round((totalFlow / maxFlow) * 100)
+})
+
+const responseRate = computed(() => {
+  if (store.feedbacks.length === 0) return 100
+  const resolved = store.feedbacks.filter(f => f.status === 'resolved').length
+  const processing = store.feedbacks.filter(f => f.status === 'processing').length
+  return Math.round(((resolved + processing) / store.feedbacks.length) * 100)
+})
+
+const rotationCompletion = computed(() => {
+  if (store.rotationSchedules.length === 0) return 0
+  const completed = store.rotationSchedules.filter(s => s.status === 'completed').length
+  return Math.round((completed / store.rotationSchedules.length) * 100)
+})
 
 const exportReport = () => {
-  alert('统计报表已导出！（模拟功能）')
+  alert('统计报表已导出！（模拟功能）\n\n报表包含：\n- 计划与实际流量对比\n- 各村组用水明细\n- 到水率统计\n- 超时放水记录\n- 节水建议方案')
 }
 </script>
 

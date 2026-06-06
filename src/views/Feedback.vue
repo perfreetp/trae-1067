@@ -179,8 +179,12 @@ const resolveForm = reactive({
 })
 
 const todayFeedbacks = computed(() => {
-  const today = new Date().toISOString().split('T')[0]
-  return store.feedbacks.filter(f => f.reportTime.startsWith(today))
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const todayStrAlt = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`
+  return store.feedbacks.filter(f => {
+    return f.reportTime.startsWith(todayStr) || f.reportTime.startsWith(todayStrAlt)
+  })
 })
 
 const resolvedRate = computed(() => {
@@ -223,9 +227,11 @@ const submitFeedback = () => {
     return
   }
   
+  const now = new Date()
+  const formattedTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
   const feedback: Omit<FieldFeedback, 'id'> = {
     ...newFeedback,
-    reportTime: new Date().toLocaleString('zh-CN'),
+    reportTime: formattedTime,
     status: 'reported'
   }
   

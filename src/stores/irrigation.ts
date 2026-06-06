@@ -182,7 +182,7 @@ export const useIrrigationStore = defineStore('irrigation', {
       {
         id: 'f1',
         reporter: '巡渠员-王强',
-        reportTime: '2024-06-15 09:30:00',
+        reportTime: '2026-06-06 09:30:00',
         type: 'leakage',
         location: '东干渠K3+200处',
         description: '渠堤有轻微渗漏，约每分钟5升',
@@ -192,7 +192,7 @@ export const useIrrigationStore = defineStore('irrigation', {
       {
         id: 'f2',
         reporter: '巡渠员-张伟',
-        reportTime: '2024-06-15 10:15:00',
+        reportTime: '2026-06-06 10:15:00',
         type: 'blockage',
         location: '西干渠K1+500处',
         description: '渠道内有杂草和漂浮物堆积，影响过水',
@@ -201,13 +201,13 @@ export const useIrrigationStore = defineStore('irrigation', {
       {
         id: 'f3',
         reporter: '村民-刘建国',
-        reportTime: '2024-06-14 16:45:00',
+        reportTime: '2026-06-05 16:45:00',
         type: 'theft',
         location: '南干渠K2+100处',
         description: '发现有人私自接管取水',
         status: 'resolved',
         handler: '执法队',
-        handleTime: '2024-06-15 08:00:00',
+        handleTime: '2026-06-05 18:00:00',
         handleResult: '已拆除私接管道，对当事人进行批评教育'
       }
     ] as FieldFeedback[]
@@ -289,6 +289,14 @@ export const useIrrigationStore = defineStore('irrigation', {
       const op = this.gateOperations.find(o => o.id === id)
       if (op) {
         op.status = status
+        if (status === 'completed') {
+          const gate = this.gates.find(g => g.id === op.gateId)
+          if (gate) {
+            gate.currentOpening = op.targetOpening
+            gate.status = op.targetOpening > 0 ? 'open' : 'closed'
+            gate.lastOperation = new Date().toLocaleString('zh-CN')
+          }
+        }
       }
     },
     
